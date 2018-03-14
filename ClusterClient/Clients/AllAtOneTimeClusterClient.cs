@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using log4net;
@@ -13,24 +14,25 @@ namespace ClusterClient.Clients
         {
         }
 
-        public async override Task<string> ProcessRequestAsync(string query, TimeSpan timeout)
+        public async override Task<TaskResult> ProcessRequestAsync(string query, TimeSpan timeout)
         {
             var webRequests = ReplicaAddresses
-                .Select(uri => CreateRequest(uri + "?query=" + query));
+                .ToDictionary(uri => uri, uri => CreateRequest(uri + "?query=" + query));
 
             foreach (var request in webRequests)
-                Log.InfoFormat("Processing {0}", request.RequestUri);
+                Log.InfoFormat("Processing {0}", request.Value.RequestUri);
 
-            var resultTasks = webRequests
-                .Select(async request => await ProcessRequestAsync(request))
+            var requestTasks = webRequests
+                .ToDictionary(k => k.Key, async request => await ProcessRequestAsync(request.Value))
                 .ToArray();
 
-            var result = await Task.WhenAny(resultTasks);
-            await Task.WhenAny(result, Task.Delay(timeout));
-            if (!result.IsCompleted)
+            var resultTask = await Task.WhenAny(requestTasks.Select(p => p.Value).ToArray());
+            await Task.WhenAny(resultTask, Task.Delay(timeout));
+            if (!resultTask.IsCompleted)
                 throw new TimeoutException();
 
-            return result.Result;
+            
+            return new TaskResult(resultTask.Result, requestTasks.First(p => p.Value == resultTask).Key);
         }
 
         protected override ILog Log

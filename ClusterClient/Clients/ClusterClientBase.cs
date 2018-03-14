@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
@@ -17,7 +18,8 @@ namespace ClusterClient.Clients
             ReplicaAddresses = replicaAddresses;
         }
 
-        public abstract Task<string> ProcessRequestAsync(string query, TimeSpan timeout);
+        public abstract Task<TaskResult> ProcessRequestAsync(string query, TimeSpan timeout);
+
         protected abstract ILog Log { get; }
 
         protected static HttpWebRequest CreateRequest(string uriStr)

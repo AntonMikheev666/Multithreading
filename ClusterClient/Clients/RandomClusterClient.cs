@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using log4net;
 
@@ -13,7 +14,7 @@ namespace ClusterClient.Clients
         {
         }
 
-        public async override Task<string> ProcessRequestAsync(string query, TimeSpan timeout)
+        public async override Task<TaskResult> ProcessRequestAsync(string query, TimeSpan timeout)
         {
             var uri = ReplicaAddresses[random.Next(ReplicaAddresses.Length)];
             var webRequest = CreateRequest(uri + "?query=" + query);
@@ -25,7 +26,7 @@ namespace ClusterClient.Clients
             if (!resultTask.IsCompleted)
                 throw new TimeoutException();
 
-            return resultTask.Result;
+            return new TaskResult(resultTask.Result, uri);
         }
 
         protected override ILog Log

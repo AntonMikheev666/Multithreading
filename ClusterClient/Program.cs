@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -21,14 +22,18 @@ namespace ClusterClient
             if (!TryGetReplicaAddresses(args, out replicaAddresses))
                 return;
 
+            var replicaAverageDelay = new Dictionary<string, Tuple<long, int>>();
+            foreach (var address in replicaAddresses)
+                replicaAverageDelay.Add(address, Tuple.Create((long)0, 0));
+
             try
             {
                 var clients = new ClusterClientBase[]
                               {
                                   new RandomClusterClient(replicaAddresses),
                                   new AllAtOneTimeClusterClient(replicaAddresses),
-                                  new RoundRobinClusterClient(replicaAddresses), 
-                                  new SmartClusterClient(replicaAddresses), 
+                                  new RoundRobinClusterClient(replicaAddresses, replicaAverageDelay), 
+                                  new SmartClusterClient(replicaAddresses, replicaAverageDelay), 
                               };
                 var queries = new[] {"От", "топота", "копыт", "пыль", "по", "полю", "летит", "На", "дворе", "трава", "на", "траве", "дрова"};
 
@@ -41,9 +46,15 @@ namespace ClusterClient
                             var timer = Stopwatch.StartNew();
                             try
                             {
-                                await client.ProcessRequestAsync(query, TimeSpan.FromSeconds(6));
+                                var result = await client.ProcessRequestAsync(query, TimeSpan.FromSeconds(6));
 
-                                Console.WriteLine("Processed query \"{0}\" in {1} ms", query, timer.ElapsedMilliseconds);
+                                var processTime = timer.ElapsedMilliseconds;
+                                var averDelayAndQueryCount = replicaAverageDelay[result.URI];
+                                var newAverDelay = (averDelayAndQueryCount.Item1 * averDelayAndQueryCount.Item2 + processTime) /
+                                                   (averDelayAndQueryCount.Item2 + 1);
+                                replicaAverageDelay[result.URI] = Tuple.Create(newAverDelay, averDelayAndQueryCount.Item2 + 1);
+
+                                Console.WriteLine("Processed query \"{0}\" in {1} ms", query, processTime);
                             }
                             catch (TimeoutException)
                             {

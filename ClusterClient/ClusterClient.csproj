@@ -54,6 +54,7 @@
     <Compile Include="Clients\SmartClusterClient.cs" />
     <Compile Include="Clients\RoundRobinClusterClient.cs" />
     <Compile Include="Clients\RandomClusterClient.cs" />
+    <Compile Include="TaskResult.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
