@@ -15,6 +15,7 @@ namespace ClusterClient
         static void Main(string[] args)
         {
             XmlConfigurator.Configure();
+            args = new  [] { "-f", "ServerAddresses.txt" };
 
             string[] replicaAddresses;
             if (!TryGetReplicaAddresses(args, out replicaAddresses))
@@ -24,7 +25,10 @@ namespace ClusterClient
             {
                 var clients = new ClusterClientBase[]
                               {
-                                  new RandomClusterClient(replicaAddresses)
+                                  new RandomClusterClient(replicaAddresses),
+                                  new AllAtOneTimeClusterClient(replicaAddresses),
+                                  new RoundRobinClusterClient(replicaAddresses), 
+                                  new SmartClusterClient(replicaAddresses), 
                               };
                 var queries = new[] {"От", "топота", "копыт", "пыль", "по", "полю", "летит", "На", "дворе", "трава", "на", "траве", "дрова"};
 
