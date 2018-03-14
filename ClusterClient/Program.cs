@@ -31,6 +31,7 @@ namespace ClusterClient
                 var clients = new ClusterClientBase[]
                               {
                                   new RandomClusterClient(replicaAddresses),
+                                  new GrayListClusterClient(replicaAddresses, TimeSpan.FromMilliseconds(1000)), 
                                   new AllAtOneTimeClusterClient(replicaAddresses),
                                   new RoundRobinClusterClient(replicaAddresses, replicaAverageDelay), 
                                   new SmartClusterClient(replicaAddresses, replicaAverageDelay), 
