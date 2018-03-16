@@ -21,11 +21,10 @@ namespace ClusterClient.Clients
             this.grayTTL = grayTTL;
         }
 
-        public async override Task<TaskResult> ProcessRequestAsync(string query, TimeSpan timeout)
+        public async override Task<string> ProcessRequestAsync(string query, TimeSpan timeout)
         {
             timeout = new TimeSpan((long)(timeout.Ticks * 1.0 / ReplicaAddresses.Length));
-
-            var time = Stopwatch.StartNew();
+            
             foreach (var uri in ReplicaAddresses)
             {
                 if (grayURIs.Contains(uri))
@@ -38,10 +37,11 @@ namespace ClusterClient.Clients
 
                 var resultTask = ProcessRequestAsync(webRequest);
                 await Task.WhenAny(resultTask, Task.Delay(timeout));
-                if (resultTask.IsCompleted)
-                    return new TaskResult(resultTask.Result, url);
-                else
+                if (!resultTask.IsCompleted)
                     await AddToGrays(url);
+
+                if(!resultTask.IsFaulted)
+                    return resultTask.Result;
             }
 
             throw new TimeoutException();

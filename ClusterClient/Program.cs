@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -22,21 +23,24 @@ namespace ClusterClient
             if (!TryGetReplicaAddresses(args, out replicaAddresses))
                 return;
 
-            var replicaAverageDelay = new Dictionary<string, Tuple<long, int>>();
-            foreach (var address in replicaAddresses)
-                replicaAverageDelay.Add(address, Tuple.Create((long)0, 0));
+            var replicaAverageDelay = new ConcurrentDictionary<string, Tuple<long, int>>();
+            
 
             try
             {
                 var clients = new ClusterClientBase[]
                               {
                                   new RandomClusterClient(replicaAddresses),
-                                  new GrayListClusterClient(replicaAddresses, TimeSpan.FromMilliseconds(1000)), 
+                                  new GrayListClusterClient(replicaAddresses, TimeSpan.FromMilliseconds(1000)),
                                   new AllAtOneTimeClusterClient(replicaAddresses),
-                                  new RoundRobinClusterClient(replicaAddresses, replicaAverageDelay), 
-                                  new SmartClusterClient(replicaAddresses, replicaAverageDelay), 
+                                  new RoundRobinClusterClient(replicaAddresses),
+                                  new SmartClusterClient(replicaAddresses),
+                                  new HistoryClusterClient(replicaAddresses)
                               };
-                var queries = new[] {"От", "топота", "копыт", "пыль", "по", "полю", "летит", "На", "дворе", "трава", "на", "траве", "дрова"};
+                var queries = new[]
+                {
+                    "От", "топота", "копыт", "пыль", "по", "полю", "летит", "На", "дворе", "трава", "на", "траве", "дрова",
+                };
 
                 foreach (var client in clients)
                 {
@@ -49,13 +53,7 @@ namespace ClusterClient
                             {
                                 var result = await client.ProcessRequestAsync(query, TimeSpan.FromSeconds(6));
 
-                                var processTime = timer.ElapsedMilliseconds;
-                                var averDelayAndQueryCount = replicaAverageDelay[result.URI];
-                                var newAverDelay = (averDelayAndQueryCount.Item1 * averDelayAndQueryCount.Item2 + processTime) /
-                                                   (averDelayAndQueryCount.Item2 + 1);
-                                replicaAverageDelay[result.URI] = Tuple.Create(newAverDelay, averDelayAndQueryCount.Item2 + 1);
-
-                                Console.WriteLine("Processed query \"{0}\" in {1} ms", query, processTime);
+                                Console.WriteLine("Processed query \"{0}\" in {1} ms", query, timer.ElapsedMilliseconds);
                             }
                             catch (TimeoutException)
                             {
@@ -67,6 +65,7 @@ namespace ClusterClient
             }
             catch (Exception e)
             {
+                Console.WriteLine(e);
                 Log.Fatal(e);
             }
         }

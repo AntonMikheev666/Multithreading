@@ -18,7 +18,7 @@ namespace ClusterClient.Clients
             ReplicaAddresses = replicaAddresses;
         }
 
-        public abstract Task<TaskResult> ProcessRequestAsync(string query, TimeSpan timeout);
+        public abstract Task<string> ProcessRequestAsync(string query, TimeSpan timeout);
 
         protected abstract ILog Log { get; }
 

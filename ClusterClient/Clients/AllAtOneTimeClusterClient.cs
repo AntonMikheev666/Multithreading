@@ -14,25 +14,34 @@ namespace ClusterClient.Clients
         {
         }
 
-        public async override Task<TaskResult> ProcessRequestAsync(string query, TimeSpan timeout)
+        public async override Task<string> ProcessRequestAsync(string query, TimeSpan timeout)
         {
             var webRequests = ReplicaAddresses
-                .ToDictionary(uri => uri, uri => CreateRequest(uri + "?query=" + query));
-
-            foreach (var request in webRequests)
-                Log.InfoFormat("Processing {0}", request.Value.RequestUri);
-
-            var requestTasks = webRequests
-                .ToDictionary(k => k.Key, async request => await ProcessRequestAsync(request.Value))
+                .Select(uri => CreateRequest(uri + "?query=" + query))
                 .ToArray();
 
-            var resultTask = await Task.WhenAny(requestTasks.Select(p => p.Value).ToArray());
-            await Task.WhenAny(resultTask, Task.Delay(timeout));
-            if (!resultTask.IsCompleted)
-                throw new TimeoutException();
+            foreach (var request in webRequests)
+                Log.InfoFormat("Processing {0}", request);
 
+            var requestTasks = webRequests
+                .Select(async request => await ProcessRequestAsync(request))
+                .ToList();
             
-            return new TaskResult(resultTask.Result, requestTasks.First(p => p.Value == resultTask).Key);
+            while (requestTasks.Count > 0)
+            {
+                var resultTask = await Task.WhenAny(requestTasks);
+                await Task.WhenAny(resultTask, Task.Delay(timeout));
+
+                if (!resultTask.IsCompleted)
+                    throw new TimeoutException();
+
+                if (!resultTask.IsFaulted)
+                    return resultTask.Result;
+
+                requestTasks.Remove(resultTask);
+            }
+
+            throw new TimeoutException();
         }
 
         protected override ILog Log
